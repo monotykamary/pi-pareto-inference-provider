@@ -7,6 +7,7 @@
 _OpenAI-compatible provider extension for [pi](https://github.com/earendil-works/pi-coding-agent)._
 
 [![pi extension](https://img.shields.io/badge/pi-extension-blueviolet)](https://github.com/earendil-works/pi-coding-agent)
+[![npm](https://img.shields.io/npm/v/pi-pareto-inference-provider)](https://www.npmjs.com/package/pi-pareto-inference-provider)
 [![license](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
 </div>
@@ -38,7 +39,13 @@ Pareto also accepts the alias `glm-5.3-flash` for `z-ai/glm-5.3-flash`.
 
 ### Option 1: Using `pi install` (Recommended)
 
-Install directly from GitHub:
+Install from npm:
+
+```bash
+pi install npm:pi-pareto-inference-provider
+```
+
+Or directly from GitHub:
 
 ```bash
 pi install https://github.com/monotykamary/pi-pareto-inference-provider

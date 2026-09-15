@@ -24,6 +24,14 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/monotykamary/pi-pareto-inference-provider.git"
+  },
+  "homepage": "https://github.com/monotykamary/pi-pareto-inference-provider#readme",
+  "bugs": {
+    "url": "https://github.com/monotykamary/pi-pareto-inference-provider/issues"
+  },
   "pi": {
     "extensions": [
       "./index.ts"
