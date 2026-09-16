@@ -1,6 +1,6 @@
 <div align="center">
 
-#  pi-pareto-inference-provider
+# 📐 pi-pareto-inference-provider
 
 **GLM-5.3 Flash on [Pareto Inference](https://paretoinference.com) — Pareto's own GPUs, pay per token**
 
