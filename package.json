@@ -1,6 +1,6 @@
 {
   "name": "pi-pareto-inference-provider",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Pareto Inference provider extension for pi - GLM-5.3 Flash, GLM-5.3, and DeepSeek V4 Flash through Pareto's OpenAI-compatible API",
   "type": "module",
   "main": "index.ts",
