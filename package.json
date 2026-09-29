@@ -1,14 +1,16 @@
 {
   "name": "pi-pareto-inference-provider",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Pareto Inference provider extension for pi - GLM-5.3 Flash, GLM-5.3, and DeepSeek V4 Flash through Pareto's OpenAI-compatible API",
   "type": "module",
   "main": "index.ts",
   "scripts": {
     "clean": "echo 'nothing to clean'",
     "build": "echo 'nothing to build'",
-    "check": "tsc --noEmit",
-    "update-models": "node scripts/update-models.js"
+    "check": "tsc --noEmit && node scripts/test-pi-compat.mjs",
+    "update-models": "node scripts/update-models.js",
+    "test:pi": "node scripts/test-pi-compat.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "pi",
@@ -38,8 +40,11 @@
     ]
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.87.0",
+    "@earendil-works/pi-coding-agent": "0.99.0",
     "@types/node": "^24.10.1",
     "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
   }
 }
