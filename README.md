@@ -16,7 +16,7 @@ _OpenAI-compatible provider extension for [pi](https://github.com/earendil-works
 
 ## Features
 
-- **2+ AI Models** — `z-ai/glm-5.3-flash` (the documented offer), `z-ai/glm-5.3`, and `deepseek/deepseek-v4-flash`, synced live from Pareto's public `GET /v1/models`
+- **1+ AI Models** — `z-ai/glm-5.3-flash` (the documented offer), `z-ai/glm-5.3`, and `deepseek/deepseek-v4-flash`, synced live from Pareto's public `GET /v1/models`
 - **Endpoint-verified thinking ladder** — `/thinking` levels map one-to-one to `reasoning_effort` (`off → none`, `minimal → minimal`, `low → low`, `medium → medium`, `high → high`, `max → max`); `xhigh` is hidden because the API returns HTTP 500 for it
 - **Image input** — verified against the live endpoint (1×1 PNG round-trip), so image attachments work on `z-ai/glm-5.3-flash`
 - **Published token pricing** — $0.03/M input, $0.10/M output, $0.006/M cached input for GLM-5.3 Flash ([pricing](https://docs.paretoinference.com/pricing))
@@ -28,7 +28,6 @@ _OpenAI-compatible provider extension for [pi](https://github.com/earendil-works
 
 | Model | Type | Context | Max Tokens | Input Cost | Output Cost |
 |-------|------|---------|------------|------------|-------------|
-| GLM 5.3 | Text | 131K | 131K | — | — |
 | GLM 5.3 Flash | Text + Image | 131K | 131K | $0.03 | $0.10 |
 *Costs are per million tokens. Pareto publishes pricing for GLM-5.3 Flash only. Pareto has not published deployment context/output limits — ask Pareto for them; until then this extension ships a conservative 131,072-token context and output floor derived from the documented `max_tokens` range (1–131,072). Raise the values in `patch.json` once real limits are published.*
 
