@@ -21,7 +21,7 @@ _OpenAI-compatible provider extension for [pi](https://github.com/earendil-works
 - **Image input** — verified against the live endpoint (1×1 PNG round-trip), so image attachments work on `z-ai/glm-5.3-flash`
 - **Published token pricing** — $0.03/M input, $0.10/M output, $0.006/M cached input for GLM-5.3 Flash ([pricing](https://docs.paretoinference.com/pricing))
 - **Stale-While-Revalidate catalog** — instant startup from disk cache → embedded `models.json`, background refresh on session start, hot-swap without restart, 14-day grace period for delisted models
-- **Key-free catalog sync** — `GET /v1/models` is public, so model lists refresh even before auth is configured
+- **Quiet live model sync** — Models refresh from Pareto's `GET /v1/models` in the background, at most hourly, by one pi process at a time, and only once an API key is configured ([details](#runtime-sync))
 - **Tool-call safe** — verified multi-turn replay (assistant tool calls without `reasoning_content`) and streaming tool calls via [synbad](https://github.com/synthetic-lab/synbad)
 
 ## Available Models
@@ -75,6 +75,11 @@ Secret managers work too — pi resolves `!command` values, so an `auth.json` en
 "pareto": { "type": "api_key", "key": "!localterm secret get pareto_inference_api_key" }
 ```
 
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PARETO_API_KEY` | No | Your Pareto API key (fallback if not in auth.json) |
+| `PI_PROVIDER_SYNC_TTL_MS` | No | Model sync freshness window in ms (default `3600000`; `0` = revalidate every session start) |
+
 ## Usage
 
 Select a model with `/model`, or start directly:
@@ -117,6 +122,22 @@ node scripts/update-models.js
 ```
 
 It fetches `GET https://api.paretoinference.com/v1/models` (no key required), preserves curated fields for known ids, moves delisted models into `deprecated-models.json` with a 14-day grace period, and regenerates the table above. See `AGENTS.md` for the patch pipeline (`patch.json` for per-model overrides, `custom-models.json` for models absent from the catalog).
+
+### Runtime sync
+
+Startup never waits on the network. pi starts with the cached catalog (`~/.pi/agent/cache/pareto-models.json`,
+falling back to the bundled `models.json`) and revalidates against `GET /v1/models` in the background — only when:
+
+- a Pareto API key is configured (auth.json or `PARETO_API_KEY`; no key, no request),
+- the cache is older than 1 hour, missing, or was fetched with a different API key, and
+- no other pi process is already refreshing it (a `pareto-models.lock` file next to the cache).
+
+The catalog endpoint itself is public, but without a key the provider cannot run inference, so the runtime sync
+skips the request until a key is set (the first session after adding one refreshes immediately). So `/new`,
+`/reload`, `pi -p` and fan-out child agents share one cache instead of each calling the API; a session that skips
+the fetch still picks up a cache another process refreshed. A failed refresh is retried after 5 minutes at the
+earliest. `PI_PROVIDER_SYNC_TTL_MS` changes the window (`0` revalidates on every session start). Only a hash
+fingerprint of the key is stored (`pareto-models.sync.json`), never the key itself.
 
 ## Verification
 

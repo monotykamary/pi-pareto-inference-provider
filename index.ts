@@ -11,14 +11,19 @@
  *
  * Model resolution strategy: Stale-While-Revalidate
  *   1. Serve stale immediately: disk cache → embedded models.json (zero-latency)
- *   2. Revalidate in background: GET /v1/models (public, no key) → merge with
- *      embedded → cache → hot-swap
+ *   2. Revalidate in background: GET /v1/models → merge with embedded → cache
+ *      → hot-swap. Quiet startup sync (sync-policy.ts): only with an API key,
+ *      only when the disk cache is older than the TTL (1h,
+ *      PI_PROVIDER_SYNC_TTL_MS) or the key changed, and only one pi process at
+ *      a time (lock file next to the cache).
  *   3. patch.json + custom-models.json applied on top of whichever source won
  *
  * Merge order: [live|cache|embedded] → apply patch.json → merge custom-models.json
  *
- * The catalog endpoint is public, so model sync never blocks on credentials;
- * only chat completions need an API key.
+ * The catalog endpoint itself is public, but the background sync is still
+ * gated on the Pareto API key: without a key the provider cannot run inference,
+ * so a fresh catalog buys nothing and the request is skipped (no key → no
+ * network). Startup never blocks on credentials either way.
  *
  * Endpoint behavior verified against the live API (2026-09, z-ai/glm-5.3-flash):
  *   - reasoning_effort accepts none | minimal | low | medium | high | max;
@@ -56,6 +61,7 @@ import patchData from "./patch.json" with { type: "json" };
 import deprecatedData from "./deprecated-models.json" with { type: "json" };
 import fs from "fs";
 import path from "path";
+import { acquireModelSync, cacheChangedSinceLoad, markCacheLoaded, writeFileAtomic } from "./sync-policy";
 
 // Types
 
@@ -271,7 +277,8 @@ function loadCachedModels(): JsonModel[] | null {
 function cacheModels(models: JsonModel[]): void {
 	try {
 		fs.mkdirSync(CACHE_DIR, { recursive: true });
-		fs.writeFileSync(CACHE_PATH, JSON.stringify(models, null, 2) + "\n");
+		// Atomic (tmp + rename): other pi processes may be reading the cache right now.
+		writeFileAtomic(CACHE_PATH, JSON.stringify(models, null, 2) + "\n");
 	} catch {
 		// Cache write failure is non-fatal
 	}
@@ -336,6 +343,7 @@ function withDeprecated(models: JsonModel[]): JsonModel[] {
 }
 
 function loadStaleModels(embeddedModels: JsonModel[]): JsonModel[] {
+	markCacheLoaded(CACHE_PATH); // stat before read: lets session_start spot newer caches
 	const cached = loadCachedModels();
 	if (!cached || cached.length === 0) return embeddedModels;
 
@@ -349,12 +357,36 @@ function loadStaleModels(embeddedModels: JsonModel[]): JsonModel[] {
 	return cached;
 }
 
-async function revalidateModels(embeddedModels: JsonModel[], signal?: AbortSignal): Promise<JsonModel[] | null> {
-	const liveModels = await fetchLiveModels(signal);
-	if (!liveModels || liveModels.length === 0) return null;
-	const merged = mergeWithEmbedded(liveModels, embeddedModels);
-	cacheModels(merged);
-	return merged;
+/**
+ * Background revalidation, gated by the quiet startup sync policy
+ * (sync-policy.ts): no key → no fetch; fresh cache (TTL) → no fetch; another
+ * process already fetching → no fetch. When skipped, a cache that another
+ * process refreshed since we loaded it is adopted from disk instead.
+ *
+ * GET /v1/models does not need a key, but the sync is gated on the inference
+ * key anyway (see header): `apiKey` is the key pi would use for chat
+ * completions (auth.json or PARETO_API_KEY). It also drives the key-change
+ * fingerprint, so adding or switching keys revalidates once.
+ */
+async function revalidateModels(apiKey: string | undefined, embeddedModels: JsonModel[], signal?: AbortSignal, force = false): Promise<JsonModel[] | null> {
+	const lease = acquireModelSync({ cachePath: CACHE_PATH, apiKey, force });
+	if (!lease) return cacheChangedSinceLoad(CACHE_PATH) ? loadStaleModels(embeddedModels) : null;
+	let merged: JsonModel[] | null = null;
+	try {
+		const liveModels = await fetchLiveModels(signal);
+		if (!liveModels || liveModels.length === 0) return null;
+		merged = mergeWithEmbedded(liveModels, embeddedModels);
+		cacheModels(merged);
+		return merged;
+	} finally {
+		lease.release(merged ? "fetched" : signal?.aborted ? "aborted" : "failed");
+	}
+}
+
+/** The key pi would use for inference: auth.json entry, else PARETO_API_KEY. */
+async function resolveApiKey(ctx: any): Promise<string | undefined> {
+	const fromRegistry = await ctx?.modelRegistry?.getApiKeyForProvider?.(PROVIDER_ID);
+	return fromRegistry || process.env.PARETO_API_KEY || undefined;
 }
 
 // Extension entry point
@@ -382,18 +414,23 @@ export default function (pi: ExtensionAPI) {
 	currentModels = buildModels(loadStaleModels(embeddedModels), customModels, patches);
 	pi.registerProvider(PROVIDER_ID, makeProviderConfig());
 
-	// Revalidate in the background. GET /v1/models is public, so this never
-	// waits on credentials — only chat completions do.
-	pi.on("session_start", () => {
+	// Revalidate in the background. Fire-and-forget: never await network here —
+	// startup must not block on the provider API. Nothing is awaited and every
+	// rejection is swallowed.
+	pi.on("session_start", async (_event, ctx) => {
 		revalidateAbort?.abort();
 		revalidateAbort = new AbortController();
 		const signal = revalidateAbort.signal;
-		revalidateModels(embeddedModels, signal).then((freshBase) => {
-			if (freshBase && !signal.aborted) {
-				currentModels = buildModels(freshBase, customModels, patches);
-				pi.registerProvider(PROVIDER_ID, makeProviderConfig());
-			}
-		});
+		void Promise.resolve()
+			.then(() => resolveApiKey(ctx))
+			.then((apiKey) => revalidateModels(apiKey, embeddedModels, signal))
+			.then((freshBase) => {
+				if (freshBase && !signal.aborted) {
+					currentModels = buildModels(freshBase, customModels, patches);
+					pi.registerProvider(PROVIDER_ID, makeProviderConfig());
+				}
+			})
+			.catch(() => { /* keep serving the stale catalog */ });
 	});
 
 	pi.on("session_shutdown", () => {
