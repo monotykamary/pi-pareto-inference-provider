@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.10
 
 - Quiet startup sync: background `/v1/models` revalidation runs only with an API key, only when the disk cache is older than 1 hour (`PI_PROVIDER_SYNC_TTL_MS`, `0` = always), missing, or fetched with a different key, and only in one pi process at a time (lock file next to the cache). Failed refreshes back off for 5 minutes; sessions that skip adopt a cache refreshed by another process.
 - The catalog endpoint stays public, but the runtime sync now requires the Pareto inference key (auth.json or `PARETO_API_KEY`): without a key the provider cannot be used, so no request is made and the cached/bundled catalog is served.
