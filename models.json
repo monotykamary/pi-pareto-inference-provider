@@ -94,37 +94,5 @@
       "supportsStore": false,
       "maxTokensField": "max_tokens"
     }
-  },
-  {
-    "id": "xiaomi/mimo-v2.6-flash",
-    "name": "Mimo V2.6 Flash",
-    "reasoning": true,
-    "input": [
-      "text"
-    ],
-    "cost": {
-      "input": 0,
-      "output": 0,
-      "cacheRead": 0,
-      "cacheWrite": 0
-    },
-    "contextWindow": 131072,
-    "maxTokens": 131072,
-    "thinkingLevelMap": {
-      "off": "none",
-      "minimal": "minimal",
-      "low": "low",
-      "medium": "medium",
-      "high": "high",
-      "xhigh": null,
-      "max": "max"
-    },
-    "compat": {
-      "thinkingFormat": "openai",
-      "supportsReasoningEffort": true,
-      "supportsDeveloperRole": false,
-      "supportsStore": false,
-      "maxTokensField": "max_tokens"
-    }
   }
 ]
